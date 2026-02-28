@@ -1,0 +1,498 @@
+{
+  "agent_instructions": {
+    "before_start": [
+      "Прочитай этот файл и git log --oneline -20",
+      "Выбери ОДНУ задачу со статусом pending и наивысшим приоритетом",
+      "Проверь, что все dependencies этой задачи имеют статус done"
+    ],
+    "during_work": [
+      "Работай только над выбранной задачей",
+      "Делай коммиты после каждого логического изменения",
+      "Не трогай код, не связанный с текущей задачей"
+    ],
+    "before_finish": [
+      "Выполни ВСЕ test_steps из задачи",
+      "Меняй status на done ТОЛЬКО после успешного прохождения всех тестов",
+      "Напиши summary в progress.md",
+      "ЗАПРЕЩЕНО удалять или редактировать задачи — только менять status"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "category": "infrastructure",
+      "priority": "critical",
+      "description": "Инициализация Go-модуля, структура директорий проекта, установка зависимостей",
+      "acceptance_criteria": [
+        "go.mod создан с module clickhouse-bench",
+        "Директории cmd/, internal/config/, internal/docker/, internal/generator/, internal/loader/, internal/benchmark/, internal/profiler/, internal/report/ созданы",
+        "Директории datasets/, schemas/, queries/, scenarios/, sql/, results/ созданы",
+        "Зависимости добавлены: clickhouse-go/v2, docker/client, cobra, yaml.v3, google/uuid",
+        "go build ./... проходит без ошибок"
+      ],
+      "test_steps": [
+        "Шаг 1: Выполнить go mod tidy",
+        "Шаг 2: Выполнить go build ./...",
+        "Шаг 3: Проверить, что все директории существуют через ls"
+      ],
+      "dependencies": [],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-002",
+      "category": "infrastructure",
+      "priority": "critical",
+      "description": "Базовый CLI на Cobra: команды run, validate, list и глобальные флаги",
+      "acceptance_criteria": [
+        "Команда run принимает путь к файлу сценария или директории",
+        "Команда validate принимает путь к файлу сценария",
+        "Команда list принимает аргумент datasets|schemas|queries",
+        "Глобальные флаги: --config-dir, --row-count, --warmup-runs, --measured-runs, --batch-size, --output-dir, --output-format, --ch-image, --ch-memory",
+        "clickhouse-bench --help выводит справку",
+        "Команды пока пустые (заглушки), но парсинг аргументов работает"
+      ],
+      "test_steps": [
+        "Шаг 1: go build -o clickhouse-bench ./cmd/",
+        "Шаг 2: ./clickhouse-bench --help — проверить список команд",
+        "Шаг 3: ./clickhouse-bench run --help — проверить флаги",
+        "Шаг 4: ./clickhouse-bench validate --help",
+        "Шаг 5: ./clickhouse-bench list --help"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-003",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Парсинг YAML-конфигов: структуры данных и загрузка dataset, schema, query, scenario файлов",
+      "acceptance_criteria": [
+        "Go-структуры для Dataset, Schema, Query, Scenario соответствуют формату из design doc",
+        "Dataset: name, columns (name, type, range, values, null_probability)",
+        "Schema: name, engine, order_by, partition_by, post_create_scripts",
+        "Query: name, description, template",
+        "Scenario: name, description, dataset, schemas[], queries[], benchmark (row_count, warmup_runs, measured_runs)",
+        "Функция LoadScenario(path) загружает сценарий и резолвит все ссылки на dataset/schemas/queries",
+        "Ошибка если ссылка не найдена в --config-dir",
+        "Unit-тесты покрывают загрузку валидных и невалидных конфигов"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать тестовые YAML-файлы (dataset, schema, query, scenario) в testdata/",
+        "Шаг 2: Запустить go test ./internal/config/ -v",
+        "Шаг 3: Проверить, что невалидный YAML возвращает понятную ошибку",
+        "Шаг 4: Проверить, что отсутствующая ссылка (dataset не существует) возвращает ошибку"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-004",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Команда validate: загрузка и валидация конфигов сценария без запуска бенчмарка",
+      "acceptance_criteria": [
+        "clickhouse-bench validate scenario.yaml загружает все конфиги и проверяет ссылки",
+        "Выводит список найденных datasets, schemas, queries",
+        "Возвращает exit code 0 при успехе, 1 при ошибке валидации",
+        "Понятные сообщения об ошибках (какой файл, какая ссылка не найдена)"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать валидный набор конфигов в testdata/",
+        "Шаг 2: ./clickhouse-bench validate testdata/scenarios/test.yaml — ожидается exit 0",
+        "Шаг 3: Создать сценарий с несуществующим dataset",
+        "Шаг 4: ./clickhouse-bench validate broken.yaml — ожидается exit 1 и понятная ошибка"
+      ],
+      "dependencies": ["TASK-002", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-005",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Команда list: вывод доступных datasets, schemas, queries из --config-dir",
+      "acceptance_criteria": [
+        "clickhouse-bench list datasets — выводит имена всех датасетов из datasets/",
+        "clickhouse-bench list schemas — выводит имена всех схем из schemas/",
+        "clickhouse-bench list queries — выводит имена всех запросов из queries/",
+        "Невалидный аргумент возвращает ошибку"
+      ],
+      "test_steps": [
+        "Шаг 1: Разместить тестовые YAML-файлы в datasets/, schemas/, queries/",
+        "Шаг 2: ./clickhouse-bench list datasets — проверить вывод",
+        "Шаг 3: ./clickhouse-bench list schemas — проверить вывод",
+        "Шаг 4: ./clickhouse-bench list queries — проверить вывод",
+        "Шаг 5: ./clickhouse-bench list foobar — ожидается ошибка"
+      ],
+      "dependencies": ["TASK-002", "TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-006",
+      "category": "infrastructure",
+      "priority": "critical",
+      "description": "Docker-менеджер: запуск ClickHouse контейнера, health check, остановка и удаление",
+      "acceptance_criteria": [
+        "Функция StartContainer(image, memoryLimit) запускает контейнер ClickHouse",
+        "Порт 9000 маппится на случайный свободный порт хоста",
+        "Данные на tmpfs (эфемерные)",
+        "Health check: poll SELECT 1 через native protocol с таймаутом 30 секунд",
+        "Функция StopContainer() останавливает и удаляет контейнер",
+        "Контейнер лейблится: clickhouse-bench=true, scenario name, timestamp",
+        "Образ пуллится автоматически если отсутствует"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить StartContainer с дефолтным образом",
+        "Шаг 2: Проверить, что SELECT 1 выполняется через native protocol",
+        "Шаг 3: Выполнить docker ps — контейнер виден с правильными лейблами",
+        "Шаг 4: Вызвать StopContainer()",
+        "Шаг 5: Выполнить docker ps -a — контейнер удалён"
+      ],
+      "dependencies": ["TASK-001"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-007",
+      "category": "infrastructure",
+      "priority": "high",
+      "description": "Graceful shutdown: обработка SIGINT/SIGTERM, defer cleanup, обнаружение orphan-контейнеров",
+      "acceptance_criteria": [
+        "Signal handler перехватывает SIGINT и SIGTERM",
+        "При получении сигнала — контейнер останавливается и удаляется",
+        "defer на создании контейнера гарантирует cleanup при panic",
+        "При запуске проверяются orphan-контейнеры (лейбл clickhouse-bench=true)",
+        "Если найдены orphans — предупреждение пользователю и предложение удалить"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить контейнер через менеджер",
+        "Шаг 2: Отправить SIGINT процессу",
+        "Шаг 3: Проверить docker ps -a — контейнер удалён",
+        "Шаг 4: Запустить контейнер вручную с лейблом clickhouse-bench=true",
+        "Шаг 5: Запустить clickhouse-bench — проверить предупреждение об orphan"
+      ],
+      "dependencies": ["TASK-006"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-008",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Создание таблиц: генерация CREATE TABLE SQL из dataset columns + schema definition",
+      "acceptance_criteria": [
+        "Функция GenerateCreateTable(dataset, schema, tableName) возвращает валидный CREATE TABLE SQL",
+        "Столбцы берутся из dataset, движок/ORDER BY/PARTITION BY из schema",
+        "Имя таблицы формируется как bench_{scenario}_{schema_name}",
+        "Поддержка всех типов из design doc: UInt*, Int*, Float*, String, DateTime, Date, UUID, Enum*, Nullable(T), Array(T), LowCardinality(T)",
+        "Unit-тесты проверяют корректность генерируемого SQL"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить unit-тесты go test ./internal/config/ -run TestGenerateCreateTable",
+        "Шаг 2: Проверить, что SQL содержит все столбцы из dataset",
+        "Шаг 3: Проверить, что ENGINE, ORDER BY, PARTITION BY корректны",
+        "Шаг 4: Выполнить сгенерированный SQL на реальном ClickHouse — таблица создаётся"
+      ],
+      "dependencies": ["TASK-003", "TASK-006"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-009",
+      "category": "functional",
+      "priority": "high",
+      "description": "Post-create scripts: выполнение пользовательских SQL-скриптов после CREATE TABLE",
+      "acceptance_criteria": [
+        "После CREATE TABLE выполняются все SQL-файлы из schema.post_create_scripts",
+        "В SQL подставляется {table} на реальное имя таблицы",
+        "Скрипты выполняются последовательно в указанном порядке",
+        "Ошибка в скрипте прерывает выполнение с понятным сообщением (какой скрипт, какая ошибка)"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать тестовый SQL-скрипт с ALTER TABLE {table} ADD PROJECTION ...",
+        "Шаг 2: Создать schema с post_create_scripts, запустить создание таблицы",
+        "Шаг 3: Проверить через SHOW CREATE TABLE — projection существует",
+        "Шаг 4: Создать невалидный SQL-скрипт, проверить понятную ошибку"
+      ],
+      "dependencies": ["TASK-008"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-010",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Генератор данных: генерация случайных значений по типу столбца, range и values",
+      "acceptance_criteria": [
+        "Генератор создаёт значения для всех поддерживаемых типов",
+        "UInt*/Int*/Float*: случайное значение в range [min, max]",
+        "String без values: случайная alphanumeric строка длиной из range [min_len, max_len]",
+        "String с values: случайный выбор из списка",
+        "DateTime/Date: случайный момент в range [start, end]",
+        "UUID: случайный UUID v4",
+        "Nullable(T): генерация T с вероятностью null из null_probability",
+        "Array(T): массив случайной длины из range, элементы генерируются по типу T",
+        "LowCardinality(T): делегирует генерацию к T",
+        "Детерминированный seed для воспроизводимости",
+        "Unit-тесты покрывают все типы"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить go test ./internal/generator/ -v",
+        "Шаг 2: Проверить, что UInt64 с range [1, 100] генерирует значения в диапазоне",
+        "Шаг 3: Проверить, что String с values выбирает только из списка",
+        "Шаг 4: Проверить, что Nullable с null_probability=0.5 генерирует ~50% null",
+        "Шаг 5: Проверить, что Array длина соответствует range"
+      ],
+      "dependencies": ["TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-011",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Batch loader: пакетная вставка сгенерированных данных во все таблицы схем",
+      "acceptance_criteria": [
+        "Генерирует батч из N строк (default 10000, настраивается --batch-size)",
+        "Каждый батч вставляется во ВСЕ таблицы схем сценария (гарантия идентичных данных)",
+        "Вставка через native protocol (clickhouse-go batch INSERT)",
+        "Память: только один батч в памяти одновременно",
+        "Прогресс-бар или лог: выводит количество вставленных строк",
+        "Общее количество строк определяется benchmark.row_count"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить ClickHouse контейнер, создать 2 таблицы",
+        "Шаг 2: Вставить 100000 строк батчами по 10000",
+        "Шаг 3: SELECT count() FROM table1 — ожидается 100000",
+        "Шаг 4: SELECT count() FROM table2 — ожидается 100000",
+        "Шаг 5: SELECT * FROM table1 ORDER BY rowNumberInAllBlocks() LIMIT 10 и аналогично для table2 — данные идентичны"
+      ],
+      "dependencies": ["TASK-008", "TASK-010"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-012",
+      "category": "functional",
+      "priority": "high",
+      "description": "Проверка свободного места на диске перед генерацией данных",
+      "acceptance_criteria": [
+        "Оценка размера: row_count × avg_row_size × кол-во схем",
+        "avg_row_size вычисляется из типов столбцов dataset",
+        "Сравнение с доступным местом на диске (с safety margin, например 20%)",
+        "При недостатке места — ошибка с exit code 2 и понятным сообщением (сколько нужно, сколько доступно)"
+      ],
+      "test_steps": [
+        "Шаг 1: Запустить с row_count=1000 — проверка проходит",
+        "Шаг 2: Проверить логику оценки размера с известными типами столбцов",
+        "Шаг 3: Unit-тест с мок-функцией доступного места (вернуть 0 байт) — ожидается ошибка"
+      ],
+      "dependencies": ["TASK-003"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-013",
+      "category": "functional",
+      "priority": "high",
+      "description": "Сбор метрик хранения: OPTIMIZE TABLE + system.parts, сравнение с оценкой",
+      "acceptance_criteria": [
+        "После вставки данных для каждой схемы: OPTIMIZE TABLE FINAL",
+        "Запрос system.parts для таблицы: rows, data_uncompressed_bytes, data_compressed_bytes",
+        "Вычисление compression_ratio",
+        "Сравнение estimated_bytes (из TASK-012) с actual_uncompressed_bytes",
+        "Результаты сохраняются в структуру StorageMetrics для каждой схемы"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать таблицу, вставить данные, выполнить OPTIMIZE",
+        "Шаг 2: Проверить, что system.parts возвращает ненулевые значения",
+        "Шаг 3: Проверить, что compression_ratio вычислен корректно (uncompressed / compressed)",
+        "Шаг 4: Проверить, что estimated vs actual присутствуют в результате"
+      ],
+      "dependencies": ["TASK-011", "TASK-012"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-014",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Benchmark runner: выполнение запросов с warmup + measured runs, wall-clock timing",
+      "acceptance_criteria": [
+        "Для каждого query × schema: сброс кешей (SYSTEM DROP MARK CACHE и др.)",
+        "warmup_runs: выполнение запроса N раз, результаты отбрасываются",
+        "measured_runs: выполнение запроса N раз с замером wall-clock time",
+        "Каждый запуск получает уникальный query_id (UUID)",
+        "template подставляет {table} на реальное имя таблицы",
+        "SYSTEM FLUSH LOGS после каждого measured run"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать таблицу с данными в ClickHouse",
+        "Шаг 2: Запустить benchmark с warmup=1, measured=3",
+        "Шаг 3: Проверить, что получено ровно 3 результата замеров",
+        "Шаг 4: Проверить, что wall_clock_ms > 0 для каждого замера",
+        "Шаг 5: Проверить наличие записей в system.query_log по query_id"
+      ],
+      "dependencies": ["TASK-008", "TASK-011"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-015",
+      "category": "functional",
+      "priority": "critical",
+      "description": "Profiler: сбор полных метрик из system.query_log по query_id",
+      "acceptance_criteria": [
+        "Запрос system.query_log по списку query_id",
+        "Собираемые метрики: query_duration_ms, read_rows, read_bytes, written_rows, written_bytes, result_rows, result_bytes, memory_usage",
+        "ProfileEvents: OSReadChars, OSWriteChars, RealTimeMicroseconds, UserTimeMicroseconds, SystemTimeMicroseconds, DiskReadElapsedMicroseconds, SelectedParts, SelectedMarks",
+        "Результаты маппятся на Go-структуру RunMetrics"
+      ],
+      "test_steps": [
+        "Шаг 1: Выполнить запрос с известным query_id",
+        "Шаг 2: SYSTEM FLUSH LOGS",
+        "Шаг 3: Вызвать Collect(queryIDs) — проверить, что все поля заполнены",
+        "Шаг 4: Проверить, что read_rows > 0 для SELECT-запроса"
+      ],
+      "dependencies": ["TASK-006"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-016",
+      "category": "functional",
+      "priority": "high",
+      "description": "Агрегация результатов: min/max/avg/p50/p95/p99 по measured runs",
+      "acceptance_criteria": [
+        "Для каждой метрики по measured_runs вычисляются: min, max, avg, p50, p95, p99",
+        "Структура AggregatedMetrics с полями для каждой метрики",
+        "Корректная работа с малым количеством runs (e.g. 1-3)",
+        "Unit-тесты с известными значениями"
+      ],
+      "test_steps": [
+        "Шаг 1: go test ./internal/benchmark/ -run TestAggregation",
+        "Шаг 2: Подать [100, 200, 300, 400, 500] — проверить min=100, max=500, avg=300",
+        "Шаг 3: Проверить p50, p95 для набора из 100 значений",
+        "Шаг 4: Проверить edge case: 1 значение — min=max=avg=p50=p95=p99"
+      ],
+      "dependencies": ["TASK-014", "TASK-015"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-017",
+      "category": "functional",
+      "priority": "high",
+      "description": "Валидация результатов запросов: проверка идентичности выходных данных между схемами",
+      "acceptance_criteria": [
+        "Для каждого query: результаты всех schema сравниваются",
+        "Сравнение по содержимому (ORDER BY не гарантирован — сортировать перед сравнением)",
+        "При расхождении: вывод какой запрос, какие схемы, в чём разница",
+        "Exit code 4 при расхождении"
+      ],
+      "test_steps": [
+        "Шаг 1: Выполнить запрос на двух таблицах с идентичными данными — проверка проходит",
+        "Шаг 2: Выполнить запрос на двух таблицах с разными данными — ожидается ошибка",
+        "Шаг 3: Проверить, что сообщение об ошибке содержит имена запроса и схем"
+      ],
+      "dependencies": ["TASK-014"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-018",
+      "category": "functional",
+      "priority": "high",
+      "description": "Экспорт результатов в JSON: benchmark.json, storage.json, meta.json",
+      "acceptance_criteria": [
+        "benchmark.json: массив результатов query × schema с runs[] и aggregated",
+        "storage.json: estimated_bytes, actual_uncompressed_bytes, actual_compressed_bytes, compression_ratio для каждой схемы",
+        "meta.json: snapshot конфигурации сценария, версия ClickHouse, timestamp запуска",
+        "Директория results/{scenario-name}/{timestamp}/",
+        "JSON human-readable (indented)"
+      ],
+      "test_steps": [
+        "Шаг 1: Сформировать тестовые результаты, вызвать Export()",
+        "Шаг 2: Проверить наличие трёх файлов в правильной директории",
+        "Шаг 3: Распарсить benchmark.json — проверить структуру",
+        "Шаг 4: Проверить, что meta.json содержит версию ClickHouse"
+      ],
+      "dependencies": ["TASK-016", "TASK-013"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-019",
+      "category": "functional",
+      "priority": "medium",
+      "description": "Экспорт результатов в CSV: альтернативный формат вывода через --output-format csv",
+      "acceptance_criteria": [
+        "При --output-format csv результаты экспортируются в CSV",
+        "Один CSV-файл с колонками: query, schema, run, wall_clock_ms, read_rows, read_bytes, memory_usage, ...",
+        "Плюс summary CSV с агрегированными метриками",
+        "Файлы в той же директории results/{scenario-name}/{timestamp}/"
+      ],
+      "test_steps": [
+        "Шаг 1: Сформировать тестовые результаты, вызвать Export() с format=csv",
+        "Шаг 2: Проверить наличие CSV-файлов",
+        "Шаг 3: Распарсить CSV — проверить заголовки и количество строк"
+      ],
+      "dependencies": ["TASK-018"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-020",
+      "category": "integration",
+      "priority": "critical",
+      "description": "Интеграция команды run: полный pipeline от загрузки конфига до экспорта результатов",
+      "acceptance_criteria": [
+        "clickhouse-bench run scenario.yaml выполняет полный цикл",
+        "Порядок: validate config → check disk → start container → create tables → post_create_scripts → generate data → collect storage metrics → run benchmarks → validate results → export → stop container",
+        "Глобальные флаги --row-count, --warmup-runs, --measured-runs переопределяют значения из конфига",
+        "Ошибки на любом этапе корректно обрабатываются, контейнер всегда удаляется",
+        "Exit codes соответствуют спецификации (0, 1, 2, 3, 4)"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать полный набор конфигов (dataset, 2 schemas, 2 queries, scenario)",
+        "Шаг 2: ./clickhouse-bench run scenario.yaml --row-count 1000 --measured-runs 2",
+        "Шаг 3: Проверить, что results/ содержит benchmark.json, storage.json, meta.json",
+        "Шаг 4: Проверить, что контейнер удалён (docker ps -a)",
+        "Шаг 5: Запустить с невалидным конфигом — exit code 1",
+        "Шаг 6: Проверить, что при ошибке контейнер тоже удаляется"
+      ],
+      "dependencies": ["TASK-004", "TASK-007", "TASK-009", "TASK-011", "TASK-013", "TASK-014", "TASK-015", "TASK-016", "TASK-017", "TASK-018"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-021",
+      "category": "integration",
+      "priority": "medium",
+      "description": "Команда run для директории: запуск всех сценариев из директории последовательно",
+      "acceptance_criteria": [
+        "clickhouse-bench run scenarios/ находит все .yaml файлы в директории",
+        "Сценарии выполняются последовательно в алфавитном порядке (001-, 002-, ...)",
+        "Каждый сценарий получает свой контейнер (запуск/остановка)",
+        "Ошибка в одном сценарии не блокирует остальные (логирование и продолжение)",
+        "Итоговый exit code — наихудший из всех сценариев"
+      ],
+      "test_steps": [
+        "Шаг 1: Создать 2 сценария в scenarios/",
+        "Шаг 2: ./clickhouse-bench run scenarios/ --row-count 1000",
+        "Шаг 3: Проверить results/ — обе поддиректории с результатами",
+        "Шаг 4: Сделать один сценарий невалидным — второй всё равно выполняется"
+      ],
+      "dependencies": ["TASK-020"],
+      "status": "pending"
+    },
+    {
+      "id": "TASK-022",
+      "category": "integration",
+      "priority": "medium",
+      "description": "Пример-сценарий: создать полный набор конфигов для демонстрации работы инструмента",
+      "acceptance_criteria": [
+        "datasets/events.yaml — пример датасета с 5 столбцами разных типов",
+        "schemas/events_by_timestamp.yaml — ORDER BY (timestamp)",
+        "schemas/events_by_event_type_timestamp.yaml — ORDER BY (event_type, timestamp)",
+        "schemas/events_by_timestamp_projected.yaml — с projection через post_create_script",
+        "queries/ — 3 запроса разного типа (filter, aggregate, group by)",
+        "sql/projections/events_agg_projection.sql — пример projection",
+        "scenarios/001-order-by-comparison.yaml — связывает всё вместе",
+        "clickhouse-bench run scenarios/001-order-by-comparison.yaml --row-count 10000 выполняется успешно"
+      ],
+      "test_steps": [
+        "Шаг 1: Убедиться, что все файлы существуют",
+        "Шаг 2: clickhouse-bench validate scenarios/001-order-by-comparison.yaml — exit 0",
+        "Шаг 3: clickhouse-bench run scenarios/001-order-by-comparison.yaml --row-count 10000 --measured-runs 2",
+        "Шаг 4: Проверить results/ — файлы существуют и содержат осмысленные данные"
+      ],
+      "dependencies": ["TASK-020"],
+      "status": "pending"
+    }
+  ]
+}
